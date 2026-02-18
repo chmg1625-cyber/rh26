@@ -1,192 +1,253 @@
-import React, { useState } from 'react';
-
-/**
- * RH26 30FV 팩깡 시뮬레이터 (v2.8 - Fix)
- * - 134+(2500억), 132+(200억), 130-131(90억) 가치 산정
- * - Rich Red & Gold 프리미엄 테마
- * - React Non-boolean attribute 경고 오류 수정 완료
- */
-
-const App = () => {
-  // --- 설정 데이터 ---
-  const PRICE_PER_PACK = 30; // 30 FV
-  
-  // 가치 설정 (단위: 억)
-  const VAL_134 = 2500;
-  const VAL_132 = 200;
-  const VAL_130 = 90;
-  
-  // 확률 계산 (기본 확률 * 4)
-  const PROB_134 = 0.18549052 * 4; 
-  const PROB_132 = 1.48392415 * 4; 
-  const PROB_130 = 100 - (PROB_134 + PROB_132); 
-  
-  // --- 상태 관리 ---
-  const [totalFV, setTotalFV] = useState(0);
-  const [totalOpened, setTotalOpened] = useState(0);
-  const [numInput, setNumInput] = useState(1);
-  const [stats, setStats] = useState({
-    ovr134: 0,
-    ovr132: 0,
-    ovr130: 0,
-  });
-
-  // --- 핵심 오픈 로직 ---
-  const executeOpen = () => {
-    const rand = Math.random() * 100;
-    if (rand < PROB_134) return 'ovr134';
-    if (rand < (PROB_134 + PROB_132)) return 'ovr132';
-    return 'ovr130';
-  };
-
-  const openMultiplePacks = () => {
-    const count = Math.max(1, Math.min(numInput, 50000)); // 성능을 고려한 최대 5만개 제한
-    let results = { ovr134: 0, ovr132: 0, ovr130: 0 };
-
-    for (let i = 0; i < count; i++) {
-      results[executeOpen()]++;
-    }
-
-    setStats(prev => ({
-      ovr134: prev.ovr134 + results.ovr134,
-      ovr132: prev.ovr132 + results.ovr132,
-      ovr130: prev.ovr130 + results.ovr130,
-    }));
-    setTotalFV(prev => prev + (PRICE_PER_PACK * count));
-    setTotalOpened(prev => prev + count);
-  };
-
-  const resetSim = () => {
-    setTotalFV(0);
-    setTotalOpened(0);
-    setStats({ ovr134: 0, ovr132: 0, ovr130: 0 });
-    setNumInput(1);
-  };
-
-  // --- 가치 계산 및 포맷팅 ---
-  const totalValueInBillions = (stats.ovr134 * VAL_134) + (stats.ovr132 * VAL_132) + (stats.ovr130 * VAL_130);
-  
-  const formatValue = (billions) => {
-    if (billions >= 10000) {
-      const jo = Math.floor(billions / 10000);
-      const eok = billions % 10000;
-      return `${jo}조 ${eok > 0 ? eok.toLocaleString() + '억' : ''}`;
-    }
-    return `${billions.toLocaleString()}억`;
-  };
-
-  // CSS 커스텀 스타일 (React 경고 방지를 위해 dangerouslySetInnerHTML 사용)
-  const customStyles = `
-    .text-shadow-custom {
-      text-shadow: 0 2px 4px rgba(0,0,0,0.5);
-    }
-    input::-webkit-outer-spin-button,
-    input::-webkit-inner-spin-button {
-      -webkit-appearance: none;
-      margin: 0;
-    }
-    .custom-no-scrollbar::-webkit-scrollbar {
-      display: none;
-    }
-  `;
-
-  return (
-    <div className="min-h-screen bg-[#1a0000] text-white p-4 font-sans select-none flex flex-col items-center justify-center">
-      <style dangerouslySetInnerHTML={{ __html: customStyles }} />
-      
-      {/* 메인 시뮬레이터 카드 */}
-      <div className="w-full max-w-md bg-gradient-to-b from-[#3a0000] to-[#0a0000] rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.9)] border-[3px] border-[#d4af37] overflow-hidden">
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>RH26 30FV 팩깡 시뮬레이터</title>
+    <!-- Tailwind CSS for modern styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
         
-        {/* 상단 헤더 */}
-        <div className="bg-gradient-to-r from-[#d4af37] via-[#f1c40f] to-[#d4af37] p-5 text-center shadow-lg">
-          <h1 className="text-2xl font-black text-[#2a0000] tracking-tighter uppercase italic">rh26 30fv팩깡</h1>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: #1a0000;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* 프리미엄 골드 테두리 및 그라데이션 */
+        .premium-border {
+            border: 3px solid #d4af37;
+        }
+
+        .gold-gradient-bg {
+            background: linear-gradient(to right, #d4af37, #f1c40f, #d4af37);
+        }
+
+        .card-gradient {
+            background: linear-gradient(to bottom, #3a0000, #0a0000);
+        }
+
+        .text-shadow-custom {
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        /* 숫자 입력기 화살표 제거 */
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        /* 애니메이션 효과 */
+        .animate-pop {
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        @keyframes popIn {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+    </style>
+</head>
+<body class="min-h-screen text-white flex flex-col items-center justify-center p-4">
+
+    <!-- 메인 시뮬레이터 카드 -->
+    <div class="w-full max-w-md card-gradient rounded-[2.5rem] shadow-[0_30px_60px_rgba(0,0,0,0.9)] premium-border overflow-hidden animate-pop">
+        
+        <!-- 상단 헤더 -->
+        <div class="gold-gradient-bg p-6 text-center shadow-lg">
+            <h1 class="text-3xl font-[900] text-[#2a0000] tracking-tighter uppercase italic">rh26 30fv팩깡</h1>
         </div>
 
-        {/* 소비 리포트 대시보드 */}
-        <div className="grid grid-cols-2 border-b border-[#d4af37]/40 bg-black/40">
-          <div className="p-5 text-center border-r border-[#d4af37]/20">
-            <p className="text-[#d4af37] text-[11px] uppercase font-black tracking-widest mb-1">소모된 총 FV</p>
-            <p className="text-3xl font-black text-white">{totalFV.toLocaleString()}</p>
-          </div>
-          <div className="p-5 text-center">
-            <p className="text-[#d4af37] text-[11px] uppercase font-black tracking-widest mb-1">총 오픈 횟수</p>
-            <p className="text-3xl font-black text-white">{totalOpened.toLocaleString()}</p>
-          </div>
-        </div>
-
-        {/* 등급별 통계 그리드 */}
-        <div className="px-6 py-8 grid grid-cols-3 gap-3 bg-white/5">
-          <div className="bg-gradient-to-b from-[#d4af37]/20 to-transparent border border-[#d4af37]/50 p-3 rounded-2xl text-center shadow-xl">
-            <p className="text-amber-400 text-[10px] font-black mb-1">134 이상</p>
-            <p className="text-3xl font-black text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.5)]">{stats.ovr134}</p>
-            <p className="text-[9px] text-[#d4af37]/70 mt-1 font-bold">확률: {PROB_134.toFixed(2)}%</p>
-          </div>
-          <div className="bg-white/5 border border-white/20 p-3 rounded-2xl text-center">
-            <p className="text-white/60 text-[10px] font-black mb-1">132 이상</p>
-            <p className="text-2xl font-black text-white">{stats.ovr132}</p>
-            <p className="text-[9px] text-white/30 mt-1 font-bold">{PROB_132.toFixed(2)}%</p>
-          </div>
-          <div className="bg-black/30 border border-white/5 p-3 rounded-2xl text-center">
-            <p className="text-white/30 text-[10px] font-black mb-1">130-131</p>
-            <p className="text-xl font-black text-white/40">{stats.ovr130}</p>
-            <p className="text-[9px] text-white/10 mt-1 font-bold">{PROB_130.toFixed(2)}%</p>
-          </div>
-        </div>
-
-        {/* 조작 인터페이스 */}
-        <div className="px-8 pb-8 space-y-5">
-          <div className="flex flex-col gap-2">
-            <label className="text-[10px] font-black text-[#d4af37] ml-1 uppercase tracking-widest opacity-60 text-shadow-custom">Open Quantity</label>
-            <div className="flex gap-3 items-center bg-black/50 p-2 rounded-2xl border-2 border-white/10 focus-within:border-[#d4af37] transition-colors">
-              <input 
-                type="number" 
-                value={numInput}
-                onChange={(e) => setNumInput(Math.max(1, parseInt(e.target.value) || 0))}
-                className="w-full bg-transparent text-center font-black text-2xl text-[#d4af37] outline-none"
-              />
-              <button 
-                onClick={openMultiplePacks}
-                className="whitespace-nowrap bg-gradient-to-r from-[#d4af37] to-[#f1c40f] hover:brightness-110 active:scale-95 transition-all px-8 py-4 rounded-xl font-black text-[#2a0000] text-lg shadow-[0_10px_20px_rgba(212,175,55,0.3)]"
-              >
-                개 까기
-              </button>
+        <!-- 소비 리포트 대시보드 -->
+        <div class="grid grid-cols-2 border-b border-[#d4af37]/40 bg-black/40">
+            <div class="p-6 text-center border-r border-[#d4af37]/20">
+                <p class="text-[#d4af37] text-[12px] uppercase font-black tracking-widest mb-1 opacity-80">소모된 총 FV</p>
+                <p id="total-fv" class="text-3xl font-[900] text-white">0</p>
             </div>
-          </div>
-          
-          <button 
-            onClick={resetSim}
-            className="w-full bg-white/5 hover:bg-white/10 py-3 rounded-xl font-black text-xs tracking-widest text-white/40 border border-white/5 transition-all uppercase"
-          >
-            Reset Simulator
-          </button>
+            <div class="p-6 text-center">
+                <p class="text-[#d4af37] text-[12px] uppercase font-black tracking-widest mb-1 opacity-80">총 오픈 횟수</p>
+                <p id="total-opened" class="text-3xl font-[900] text-white">0</p>
+            </div>
         </div>
 
-        {/* 최종 획득 가치 표시 섹션 */}
-        <div className="bg-black/80 border-t-2 border-[#d4af37]/30 p-8 shadow-inner">
-          <div className="text-center space-y-3">
-            <p className="text-[#d4af37] text-xs font-black tracking-[0.2em] uppercase opacity-80 text-shadow-custom">Total Estimated Value</p>
-            <p className="text-5xl font-black text-white tracking-tighter drop-shadow-[0_0_20px_rgba(212,175,55,0.4)]">
-              {formatValue(totalValueInBillions)}
+        <!-- 등급별 통계 그리드 -->
+        <div class="px-6 py-8 grid grid-cols-3 gap-3 bg-white/5">
+            <div class="bg-gradient-to-b from-[#d4af37]/30 to-transparent border border-[#d4af37]/50 p-4 rounded-2xl text-center shadow-xl">
+                <p class="text-amber-400 text-[11px] font-black mb-1">134 이상</p>
+                <p id="stat-134" class="text-3xl font-[900] text-white drop-shadow-[0_0_15px_rgba(252,211,77,0.6)]">0</p>
+                <p class="text-[10px] text-[#d4af37]/80 mt-1 font-bold">확률: 0.74%</p>
+            </div>
+            <div class="bg-white/5 border border-white/20 p-4 rounded-2xl text-center">
+                <p class="text-white/60 text-[11px] font-black mb-1">132 이상</p>
+                <p id="stat-132" class="text-2xl font-[900] text-white">0</p>
+                <p class="text-[10px] text-white/40 mt-1 font-bold">확률: 5.93%</p>
+            </div>
+            <div class="bg-black/30 border border-white/10 p-4 rounded-2xl text-center">
+                <p class="text-white/30 text-[11px] font-black mb-1">130-131</p>
+                <p id="stat-130" class="text-xl font-[900] text-white/40">0</p>
+                <p class="text-[10px] text-white/20 mt-1 font-bold">확률: 93.32%</p>
+            </div>
+        </div>
+
+        <!-- 조작 인터페이스 -->
+        <div class="px-10 pb-8 space-y-6">
+            <div class="flex flex-col gap-3">
+                <label class="text-[11px] font-black text-[#d4af37] ml-1 uppercase tracking-widest opacity-60 text-shadow-custom">Open Quantity (수량 입력)</label>
+                <div class="flex gap-4 items-center bg-black/50 p-3 rounded-2xl border-2 border-white/10 focus-within:border-[#d4af37] transition-all">
+                    <input 
+                        id="num-input"
+                        type="number" 
+                        value="1"
+                        min="1"
+                        class="w-full bg-transparent text-center font-[900] text-3xl text-[#d4af37] outline-none"
+                    />
+                    <button 
+                        onclick="openMultiplePacks()"
+                        class="whitespace-nowrap bg-gradient-to-r from-[#d4af37] to-[#f1c40f] hover:brightness-110 active:scale-95 transition-all px-10 py-5 rounded-xl font-black text-[#2a0000] text-xl shadow-[0_15px_30px_rgba(212,175,55,0.3)]"
+                    >
+                        개 까기
+                    </button>
+                </div>
+            </div>
+            
+            <button 
+                onclick="resetSim()"
+                class="w-full bg-white/5 hover:bg-white/10 py-4 rounded-xl font-black text-[11px] tracking-[0.3em] text-white/40 border border-white/5 transition-all uppercase"
+            >
+                Reset Simulator
+            </button>
+        </div>
+
+        <!-- 최종 획득 가치 표시 섹션 -->
+        <div class="bg-black/80 border-t-2 border-[#d4af37]/30 p-10 shadow-inner text-center">
+            <p class="text-[#d4af37] text-sm font-[900] tracking-[0.25em] uppercase opacity-80 text-shadow-custom mb-3">Total Estimated Value</p>
+            <p id="total-value" class="text-6xl font-[900] text-white tracking-tighter drop-shadow-[0_0_25px_rgba(212,175,55,0.5)]">
+                0억
             </p>
-            <div className="pt-4">
-              <div className="inline-block px-4 py-1.5 bg-red-950/40 rounded-full border border-red-900/50">
-                <p className="text-[10px] text-red-500 font-bold italic">
-                  ※ 해당 결과는 수수료를 고려하지 않음
-                </p>
-              </div>
+            <div class="pt-8">
+                <div class="inline-block px-6 py-2 bg-red-950/40 rounded-full border border-red-900/50 shadow-lg">
+                    <p class="text-[11px] text-red-500 font-black italic tracking-tight">
+                        ※ 해당 결과는 수수료를 고려하지 않았다
+                    </p>
+                </div>
             </div>
-          </div>
         </div>
 
-      </div>
-
-      {/* 정보 푸터 */}
-      <div className="mt-6 flex flex-col items-center gap-1 opacity-30">
-        <p className="text-[10px] font-bold tracking-widest text-[#d4af37]">FIFA MOBILE RH26 EDITION</p>
-        <p className="text-[9px] font-medium text-white">PROBABILITY: 0.74% | 5.93% | 93.32%</p>
-      </div>
     </div>
-  );
-};
 
-export default App;
+    <!-- 푸터 정보 -->
+    <div class="mt-8 flex flex-col items-center gap-2 opacity-30">
+        <p class="text-[11px] font-[900] tracking-widest text-[#d4af37]">FIFA MOBILE RH26 EDITION</p>
+        <p class="text-[10px] font-medium text-white tracking-tighter text-center">
+            134+ (0.7419%) | 132+ (5.9356%) | 130-131 (93.3223%)
+        </p>
+    </div>
+
+    <script>
+        // --- 설정 데이터 (하민님 제공 확률 및 가치) ---
+        const PRICE_PER_PACK = 30;
+        const VAL_134 = 2500; // 억
+        const VAL_132 = 200;  // 억
+        const VAL_130 = 90;   // 억
+
+        // 기본 확률 * 4
+        const PROB_134 = 0.18549052 * 4; 
+        const PROB_132 = 1.48392415 * 4; 
+
+        // --- 상태 관리 객체 ---
+        let state = {
+            totalFV: 0,
+            totalOpened: 0,
+            ovr134: 0,
+            ovr132: 0,
+            ovr130: 0
+        };
+
+        /**
+         * 숫자를 조 단위로 포맷팅하는 함수
+         */
+        function formatValue(billions) {
+            if (billions >= 10000) {
+                const jo = Math.floor(billions / 10000);
+                const eok = billions % 10000;
+                return jo + "조 " + (eok > 0 ? eok.toLocaleString() + "억" : "");
+            }
+            return billions.toLocaleString() + "억";
+        }
+
+        /**
+         * 화면의 모든 지표를 최신 상태로 업데이트
+         */
+        function updateUI() {
+            document.getElementById('total-fv').innerText = state.totalFV.toLocaleString();
+            document.getElementById('total-opened').innerText = state.totalOpened.toLocaleString();
+            document.getElementById('stat-134').innerText = state.ovr134.toLocaleString();
+            document.getElementById('stat-132').innerText = state.ovr132.toLocaleString();
+            document.getElementById('stat-130').innerText = state.ovr130.toLocaleString();
+
+            const totalValueInBillions = (state.ovr134 * VAL_134) + (state.ovr132 * VAL_132) + (state.ovr130 * VAL_130);
+            document.getElementById('total-value').innerText = formatValue(totalValueInBillions);
+        }
+
+        /**
+         * 대량 오픈 로직
+         */
+        function openMultiplePacks() {
+            const input = document.getElementById('num-input');
+            let count = parseInt(input.value) || 0;
+            
+            if (count <= 0) {
+                alert("1개 이상의 수량을 입력해 주세요.");
+                return;
+            }
+
+            // 성능 과부하 방지를 위해 최대 10만개로 제한 (브라우저 보호)
+            const safeCount = Math.min(count, 100000);
+            if (count > 100000) {
+                alert("한 번에 최대 100,000개까지 깔 수 있습니다.");
+            }
+
+            // 시뮬레이션 루프
+            for (let i = 0; i < safeCount; i++) {
+                const rand = Math.random() * 100;
+                if (rand < PROB_134) {
+                    state.ovr134++;
+                } else if (rand < (PROB_134 + PROB_132)) {
+                    state.ovr132++;
+                } else {
+                    state.ovr130++;
+                }
+            }
+
+            // 누적 결과 반영
+            state.totalFV += (PRICE_PER_PACK * safeCount);
+            state.totalOpened += safeCount;
+            
+            updateUI();
+        }
+
+        /**
+         * 시뮬레이터 초기화
+         */
+        function resetSim() {
+            if (!confirm("모든 데이터를 초기화하시겠습니까?")) return;
+
+            state = {
+                totalFV: 0,
+                totalOpened: 0,
+                ovr134: 0,
+                ovr132: 0,
+                ovr130: 0
+            };
+            document.getElementById('num-input').value = 1;
+            updateUI();
+        }
+
+        // 초기 화면 설정 실행
+        window.onload = updateUI;
+    </script>
+</body>
+</html>
